@@ -1,0 +1,48 @@
+************************************************************************************
+*                                                                                  *
+*                     Welcome to AWSS3Zip Utility                                  *
+*                                                                                  *
+************************************************************************************
+*                                                                                  *
+*   AWSS3Zip is a command-line utility developed to extract AWS S3 Zip             *
+*   files from a designated to extract AWS S3 Zip files from a designated          *
+*   S3 bucket destination.                                                         *
+*                                                                                  *
+*   This tool seeks to provide an intermediate solution to extract                 *
+*   multiple nested zip files into a SQL DB. The S3 log files are                  *
+*   IIS logs, the goal is to Extract & Transoform these logs into                  *
+*   an SQL Table                                                                   *
+*                                                                                  *
+*    Reasoning:                                                                    *
+*	                                                                               *
+*    AWS S3 bucket objects are stored as zipped files and extracting entire        *
+*    files and extracting entire bucket worth of zipped data is time               *
+*    consuming and difficult to view.                                              *
+*                                                                                  *
+************************************************************************************
+------------------------------------------------------------------------------------
+Usage:
+------------------------------------------------------------------------------------
+  awss3zip [options] [path to file] ...
+
+------------------------------------------------------------------------------------
+Options:
+------------------------------------------------------------------------------------
+  -e, --extract           # extract option to unzip S3 zip folder and nested
+                            zipped logs inside folder
+
+  -o, --output            # specify destination folder, by default the destination
+                            is set to output folder within the bin folder
+------------------------------------------------------------------------------------
+Example Usage:
+------------------------------------------------------------------------------------
+  awss3zip -e example.zip  # Process files in the 'example.zip' folder and 
+                             save output directory to 'output'
+
+------------------------------------------------------------------------------------
+*************************************************************************************
+*                                                                                   *
+*  For more detail:                                                                 *
+*        https://github.com/Rafat-Khandaker/AWSS3Zip                                *
+*                                                                                   *
+*************************************************************************************

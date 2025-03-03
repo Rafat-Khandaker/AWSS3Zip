@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AWSS3Zip": {
+      "commandName": "Project",
+      "commandLineArgs": "-e\r\nC:\\Users\\r_khanda\\IIS_LOGS\\2021.zip"
+    }
+  }
+}
