@@ -15,8 +15,9 @@ namespace AWSS3Zip.Start
             if (args.Length == 0)
                 Console.WriteLine(File.ReadAllText($"{AppDomain.CurrentDomain.BaseDirectory}Text\\Welcome.txt"));
 
-            else if (JobFactory.Build(args) != null)
-                JobFactory.Execute();
+            else JobFactory
+                    .Build(args)
+                        .Execute();
         }
     }
 }

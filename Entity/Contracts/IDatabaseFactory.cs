@@ -2,6 +2,6 @@
 {
     public interface IDatabaseFactory
     {
-        public AppDatabase Build();
+        public AppDatabase Build(string connection);
     }
 }

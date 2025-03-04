@@ -1,19 +1,24 @@
 ﻿using AWSS3Zip.Commands.Contracts;
+using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
-using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
+using AWSS3Zip.Service;
+using System.ComponentModel;
+using System.Text.Json;
+
 
 namespace AWSS3Zip.Commands
 {
     public class ExtractJob : IProcessJob
     {
-        string[] Parameters { get; set; }
+        public string[] Parameters { get; set; }
+        public string OriginalDirectory { get; set; }
+        public List<IISLogEvent> EntityLogEvents { get; set; }
 
-        DirectoryNode DirectoryNode { get; set; }
-
-        public ExtractJob(string[] parameters) {
+        public ExtractJob BuildParameters(string[] parameters)
+        {
             Parameters = parameters;
-            DirectoryNode = new DirectoryNode();
+            EntityLogEvents = new List<IISLogEvent>();
+            return this;
         }
 
         public void Execute()
@@ -42,13 +47,13 @@ namespace AWSS3Zip.Commands
         private void ExtractZipFiles(int iPath, int iOutput = -1 ) {
             try
             {
-                var directory = (iOutput != -1) ? Parameters[iOutput + 1] : $"{AppDomain.CurrentDomain.BaseDirectory}output";
+                OriginalDirectory = (iOutput != -1) ? Parameters[iOutput + 1] : $"{AppDomain.CurrentDomain.BaseDirectory}output";
                 var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
-                var arguments = $@"x {Parameters[iPath + 1]} -o{directory}";
+                var arguments = $@"x {Parameters[iPath + 1]} -o{OriginalDirectory}";
                 Console.WriteLine("Please Wait!\n This Could Take a While! ....");
-             //   InvokeProcess(command,arguments);
-                Console.WriteLine($"\n Files Extracted: {directory}\n building directory structure...");
-                DirectoryNode.BuildDirectoryStructure(directory); 
+                //  Processor.InvokeProcess(command,arguments);
+                Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n building directory structure...");
+                BuildDirectoryStructure(OriginalDirectory); 
 
             }
             catch (Exception e)
@@ -57,25 +62,120 @@ namespace AWSS3Zip.Commands
             }        
         }
 
-        private void InvokeProcess(string command, string arguments) {
-            ProcessStartInfo processStartInfo = new ProcessStartInfo
-            {
-                FileName = command,  
-                Arguments = arguments,  
-                RedirectStandardOutput = true,  
-                UseShellExecute = false, 
-                CreateNoWindow = true 
-            };
+        private DirectoryNode BuildDirectoryStructure(string directory, DirectoryNode node = null, bool first = true)
+        {
+            if (node == null) node = new DirectoryNode();
 
-            using (Process process = Process.Start(processStartInfo))
+            if (Directory.Exists(directory))
             {
-                using (var reader = process.StandardOutput)
-                {
-                    string result = reader.ReadToEnd();
-                    Console.WriteLine(result);
+                var directoryFolders = Directory.GetDirectories(directory);
+
+                if (directoryFolders.Length > 0)
+                    foreach (var folder in directoryFolders)
+                    {
+                        if (first)
+                        {
+                            node.Name = folder.Split("\\").Last().ToString();
+                            node.Path = $"{folder}";
+                            node.Type = FileType.Folder;
+
+                            first = false;
+                            node.Inside = new DirectoryNode() { Parent = node };
+
+                        }
+                        else
+                        {
+                            node.Next = new DirectoryNode(folder.Split("\\").Last().ToString(), $"{folder}") { Previous = node, Parent = node.Parent };
+                            node = node.Next;
+                            node.Inside = new DirectoryNode() { Parent = node };
+
+                        }
+                    }
+                else
+                    foreach (var file in Directory.GetFiles(directory))
+                    {
+                        if (first)
+                        {
+                            node.Name = file;
+                            node.Path = $"{directory}{file}";
+                            node.Type = FileType.Zip;
+
+                            first = false;
+                        }
+                        else
+                        {
+                            node.Next = new DirectoryNode(file.Split("\\").Last().ToString(), $"{directory}{file}") { Previous = node, Parent = node.Parent, Type = FileType.Zip };
+                            node = node.Next;
+                            node.Inside = new DirectoryNode() { Parent = node };
+                        }
+                    }
+
+                first = true;
+
+                return Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Name, first, node);
+
+            }
+
+            return node.Previous != null ?
+                    BuildDirectoryStructure(node.Previous.Path, node.Previous, first) :
+                        node.Parent != null ?
+                            BuildDirectoryStructure(node.Parent.Path, node.Parent, first) :
+                            node;
+        }
+
+        private DirectoryNode Unzip_File_Execute_SQL_Task_And_Recurse_Directory(string directory, string name, bool first, DirectoryNode node)
+        {
+            var previousDirectory = directory;
+            directory = $"{directory}\\{name}";
+
+            if (Directory.Exists(directory))
+                return BuildDirectoryStructure(directory, node.Inside, first);
+            else
+            {
+                if (node.Type == FileType.Zip) {
+                    Console.WriteLine("Unzipping contents of inner zip files...May take a while.. ");
+                    var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
+                    var arguments = $@"x {directory} -o{previousDirectory}";
+                    Processor.InvokeProcess(command, arguments);
+
+                    Console.WriteLine("Deleting previous zip file.. ");
+                    File.Delete(directory);
+                    node.Name += "~";
+                    node.Path += "~";
+                    node.Type = FileType.Text;
+
+                    var json = File.ReadAllBytes(node.Path);
+
+                    var logEventList = JsonSerializer.Deserialize<List<IISLog>>(json);
+                    
+                        logEventList.ForEach(x => {
+                            EntityLogEvents.AddRange(
+                                x.logEvents.Select(s => new IISLogEvent(){
+                                    MessageType = x.messageType,
+                                    Owner = x.owner,
+                                    LogGroup = x.logGroup,
+                                    LogStream = x.logStream,
+                                    SubscriptionFilters = JsonSerializer.Serialize(x.subscriptionFilters),
+                                    DateTime = DateTimeOffset.FromUnixTimeMilliseconds(s.timestamp).DateTime,
+                                    RequestMessage = s.message
+                                }));
+                        });
                 }
+
+                node.Inside = null;
+                var parts = previousDirectory.Split("\\");
+                directory = string.Join("\\", parts, 0, parts.Length - 1);
+                return (node.Previous != null) ?
+                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(previousDirectory, node.Previous.Name, first, node.Previous) :
+                           (!directory.Equals(OriginalDirectory) && node.Parent != null) ?
+                                Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Parent.Previous.Name, first, node.Parent.Previous) :
+                                    node;
             }
         }
+
+        
+
+
 
 
     }

@@ -1,17 +1,24 @@
 ﻿using AWSS3Zip.Entity.Contracts;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
 
 namespace AWSS3Zip.Entity
 {
     public class DatabaseFactory : IDatabaseFactory
     {
-        IAppDatabase AppDatabase;
-        public DatabaseFactory(IAppDatabase _AppDatabase) {
-            AppDatabase = _AppDatabase;
-        }
-
-        public AppDatabase Build()
+        AppDatabase AppDatabase { get; set; }
+    
+        public AppDatabase Build(string connection)
         {
-            return null;
+            if (AppDatabase == null) {
+                var optionsBuilder = new DbContextOptionsBuilder<AppDatabase>();
+                optionsBuilder.UseSqlServer(connection);
+
+                AppDatabase = new AppDatabase(optionsBuilder.Options);
+            }
+           
+            return AppDatabase;
         }
     }
 }

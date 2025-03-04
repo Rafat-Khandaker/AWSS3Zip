@@ -31,8 +31,15 @@ Options:
   -e, --extract           # extract option to unzip S3 zip folder and nested
                             zipped logs inside folder
 
-  -o, --output            # specify destination folder, by default the destination
-                            is set to output folder within the bin folder
+    Sub Options:
+       -o, --output            # specify destination folder, by default the 
+                                 destination is set to output folder within 
+                                 the bin folder
+
+  -db, --database   # Provide database connection string to migrate IIS Logs to DB
+
+  -w, --write    # Provide output file to write logs into text file
+
 ------------------------------------------------------------------------------------
 Example Usage:
 ------------------------------------------------------------------------------------

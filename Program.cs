@@ -20,10 +20,13 @@ internal class Program
             .ConfigureServices((hostContext, services) =>
             {
                 services.AddSingleton<ExtractJob, ExtractJob>();
+                services.AddSingleton<DatabaseJob, DatabaseJob>();
+                services.AddSingleton<WriteFileJob, WriteFileJob>();
                 services.AddSingleton<IDatabaseFactory, DatabaseFactory>();
-                services.AddSingleton<IAppDatabase, AppDatabase>(); 
+
                 services.AddScoped<IDatabaseContext<DatabaseFactory, AppDatabase>, DatabaseContext>();
                 services.AddScoped<IProcessFactory<IProcessJob>, JobFactory>();
+
                 services.AddTransient<CommandLineRunner, CommandLineRunner>();
             });
 
