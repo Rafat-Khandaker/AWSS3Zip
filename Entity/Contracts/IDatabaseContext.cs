@@ -8,6 +8,7 @@ namespace AWSS3Zip.Entity.Contracts
 {
     public interface IDatabaseContext<X,Y> where X: IDatabaseFactory where Y: IAppDatabase 
     {
+        public AppDatabase AppDatabase { get; set; }
         public DatabaseContext AddConnection(string connectionString);
         public Y Build();
     }

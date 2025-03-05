@@ -8,6 +8,6 @@ namespace AWSS3Zip.Models
 {
     public enum FileType
     {
-        Folder, Zip, Text 
+        Folder = 0, Zip = 1, Text = 2 
     }
 }

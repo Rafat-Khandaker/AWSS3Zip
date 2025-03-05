@@ -5,7 +5,7 @@ namespace AWSS3Zip.Entity
     public class DatabaseContext : IDatabaseContext<DatabaseFactory, AppDatabase>
     {
         IDatabaseFactory DatabaseFactory;
-        AppDatabase AppDatabase { get; set; }
+        public AppDatabase AppDatabase { get; set; }
 
         public string ConnectionString { get; set; }
 

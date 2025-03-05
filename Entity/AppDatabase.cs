@@ -6,7 +6,7 @@ namespace AWSS3Zip.Entity
 {
     public class AppDatabase : DbContext, IAppDatabase
     {
-        public DbSet<IISLogEvent> IISLogEvents;
+        public DbSet<IISLogEvent> IISLogEvents { get; set; }
 
         public string ConnectionString { get; set; }
 

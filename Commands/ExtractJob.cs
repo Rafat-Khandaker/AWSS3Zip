@@ -1,7 +1,10 @@
 ﻿using AWSS3Zip.Commands.Contracts;
+using AWSS3Zip.Entity;
+using AWSS3Zip.Entity.Contracts;
 using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
 using AWSS3Zip.Service;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel;
 using System.Text.Json;
 
@@ -10,10 +13,18 @@ namespace AWSS3Zip.Commands
 {
     public class ExtractJob : IProcessJob
     {
+        public IDatabaseContext<DatabaseFactory, AppDatabase> DatabaseContext { get; set; }
+
         public string[] Parameters { get; set; }
         public string OriginalDirectory { get; set; }
         public List<IISLogEvent> EntityLogEvents { get; set; }
 
+        bool _isDatabaseTask = false;
+
+        public ExtractJob(IDatabaseContext<DatabaseFactory, AppDatabase> _dbContext)
+        {
+            DatabaseContext = _dbContext;
+        }
         public ExtractJob BuildParameters(string[] parameters)
         {
             Parameters = parameters;
@@ -24,8 +35,11 @@ namespace AWSS3Zip.Commands
         public void Execute()
         {
             var iPath = Array.IndexOf(Parameters, "-e");
+            _isDatabaseTask = Array.IndexOf(Parameters, "-db") != -1 || Array.IndexOf(Parameters, "--database") != -1;
+
 
             if (iPath == -1) Array.IndexOf(Parameters, "--extract");
+
             if (iPath != -1 && (Parameters[iPath + 1].Contains("-") || Parameters[iPath + 1].Contains("--"))) {
                 Console.WriteLine("Command not formatted Correctly, contains '-' or '--' followed by command variable");
                 return;
@@ -51,10 +65,14 @@ namespace AWSS3Zip.Commands
                 var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
                 var arguments = $@"x {Parameters[iPath + 1]} -o{OriginalDirectory}";
                 Console.WriteLine("Please Wait!\n This Could Take a While! ....");
-                //  Processor.InvokeProcess(command,arguments);
-                Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n building directory structure...");
-                BuildDirectoryStructure(OriginalDirectory); 
+              //  Processor.InvokeProcess(command,arguments);
+                Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n Creating Database and building directory structure...");
+                
+                if(_isDatabaseTask)
+                    DatabaseContext.Build().Database.EnsureCreated();
 
+                BuildDirectoryStructure(OriginalDirectory);
+                DatabaseContext.AppDatabase.Dispose();
             }
             catch (Exception e)
             {
@@ -96,15 +114,19 @@ namespace AWSS3Zip.Commands
                     {
                         if (first)
                         {
-                            node.Name = file;
-                            node.Path = $"{directory}{file}";
-                            node.Type = FileType.Zip;
+                            node.Name = file.Split("\\").Last().ToString(); ;
+                            node.Path = $"{file}";
+                            node.Type = node.Name.Contains('~')? FileType.Text : FileType.Zip;
 
                             first = false;
                         }
                         else
                         {
-                            node.Next = new DirectoryNode(file.Split("\\").Last().ToString(), $"{directory}{file}") { Previous = node, Parent = node.Parent, Type = FileType.Zip };
+                            var name = file.Split("\\").Last().ToString();
+                            node.Next = new DirectoryNode(name, $"{file}") { 
+                                Previous = node, Parent = node.Parent, Type = name.Contains('~') ? FileType.Text : FileType.Zip 
+                            };
+
                             node = node.Next;
                             node.Inside = new DirectoryNode() { Parent = node };
                         }
@@ -132,34 +154,53 @@ namespace AWSS3Zip.Commands
                 return BuildDirectoryStructure(directory, node.Inside, first);
             else
             {
-                if (node.Type == FileType.Zip) {
+                if (node.Type.Equals(FileType.Zip) ) {
                     Console.WriteLine("Unzipping contents of inner zip files...May take a while.. ");
                     var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
                     var arguments = $@"x {directory} -o{previousDirectory}";
                     Processor.InvokeProcess(command, arguments);
 
-                    Console.WriteLine("Deleting previous zip file.. ");
-                    File.Delete(directory);
-                    node.Name += "~";
-                    node.Path += "~";
+                 //   Console.WriteLine("Deleting previous zip file.. ");
+                 //   File.Delete(directory);
+                    node.Name += (node.Name.Contains('~'))? "" : "~";
+                    node.Path += (node.Path.Contains('~')) ? "" : "~"; 
                     node.Type = FileType.Text;
+                }
 
-                    var json = File.ReadAllBytes(node.Path);
+                if (node.Type.Equals(FileType.Text)) {
+                    var json = File.ReadAllText(node.Path);
+
+                    json = json.Insert(0, "[") + "]";
+                    json = json.Replace("}{", "},{");
 
                     var logEventList = JsonSerializer.Deserialize<List<IISLog>>(json);
-                    
-                        logEventList.ForEach(x => {
-                            EntityLogEvents.AddRange(
-                                x.logEvents.Select(s => new IISLogEvent(){
-                                    MessageType = x.messageType,
-                                    Owner = x.owner,
-                                    LogGroup = x.logGroup,
-                                    LogStream = x.logStream,
-                                    SubscriptionFilters = JsonSerializer.Serialize(x.subscriptionFilters),
-                                    DateTime = DateTimeOffset.FromUnixTimeMilliseconds(s.timestamp).DateTime,
-                                    RequestMessage = s.message
-                                }));
-                        });
+
+                    logEventList.ForEach(x => {
+                        EntityLogEvents.AddRange(
+                            x.logEvents.Select(s => new IISLogEvent()
+                            {
+                                Id = s.id,
+                                MessageType = x.messageType,
+                                Owner = x.owner,
+                                LogGroup = x.logGroup,
+                                LogStream = x.logStream,
+                                SubscriptionFilters = JsonSerializer.Serialize(x.subscriptionFilters),
+                                DateTime = DateTimeOffset.FromUnixTimeMilliseconds(s.timestamp).DateTime,
+                                RequestMessage = s.message
+                            }));
+                    });
+
+                    if (_isDatabaseTask)
+                    {
+                        DatabaseContext.AppDatabase.IISLogEvents.AddRange(EntityLogEvents);
+
+                        DatabaseContext.AppDatabase.SaveChanges();
+
+                        EntityLogEvents = new List<IISLogEvent>();
+                        File.Delete(node.Path);
+
+                        Console.WriteLine("Changes Saved to SQLite DB! \nYou can use Query Syntax -SQL to query data\nYou can take the local.db file and upload into SQLite db browser or MS Access");
+                    }
                 }
 
                 node.Inside = null;

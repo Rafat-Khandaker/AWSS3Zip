@@ -21,18 +21,19 @@ namespace AWSS3Zip.Commands
             ) {
             DatabaseContext = _databaseContext;
             ExtractJob = _extractJob;
+            DatabaseJob = _databaseJob;
             WriteFileJob = _writeFileJob;
         }
 
         IProcessFactory<IProcessJob> IProcessFactory<IProcessJob>.Build(string[] parameters)
         {
             Jobs = new List<IProcessJob>();
-            if (parameters.Contains("-e") || parameters.Contains("--extract"))
+            if (parameters.Contains("-e") || parameters.Contains("--extract")) 
                 Jobs.Add(ExtractJob.BuildParameters(parameters));
-            if (parameters.Contains("-db") || parameters.Contains("--database"))
-                Jobs.Add(DatabaseJob.BuildParameters(parameters, ((ExtractJob)Jobs[0]).EntityLogEvents));
-            else if (parameters.Contains("-w") || parameters.Contains("--write"))
-                Jobs.Add(WriteFileJob.BuildParameters(parameters, ((ExtractJob)Jobs[0]).EntityLogEvents));
+            //if (parameters.Contains("-db") || parameters.Contains("--database"))
+            //    Jobs.Add(DatabaseJob.BuildParameters(parameters, ((ExtractJob)Jobs[0]).EntityLogEvents));
+            //else if (parameters.Contains("-w") || parameters.Contains("--write"))
+            //    Jobs.Add(WriteFileJob.BuildParameters(parameters, ((ExtractJob)Jobs[0]).EntityLogEvents));
 
             else Console.WriteLine("Command parameter missing. Check Options!");
             return this;
