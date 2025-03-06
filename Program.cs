@@ -22,8 +22,8 @@ internal class Program
                 services.AddSingleton<ExtractJob, ExtractJob>();
                 services.AddSingleton<DatabaseJob, DatabaseJob>();
                 services.AddSingleton<WriteFileJob, WriteFileJob>();
-                services.AddSingleton<IDatabaseFactory, DatabaseFactory>();
 
+                services.AddScoped<IDatabaseFactory, DatabaseFactory>();
                 services.AddScoped<IDatabaseContext<DatabaseFactory, AppDatabase>, DatabaseContext>();
                 services.AddScoped<IProcessFactory<IProcessJob>, JobFactory>();
 

@@ -5,7 +5,9 @@ using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
 using AWSS3Zip.Service;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.IdentityModel.Tokens;
+using System.Linq;
 using System.Text.Json;
 
 
@@ -64,15 +66,14 @@ namespace AWSS3Zip.Commands
                 OriginalDirectory = (iOutput != -1) ? Parameters[iOutput + 1] : $"{AppDomain.CurrentDomain.BaseDirectory}output";
                 var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
                 var arguments = $@"x {Parameters[iPath + 1]} -o{OriginalDirectory}";
-                Console.WriteLine("Please Wait!\n This Could Take a While! ....");
-              //  Processor.InvokeProcess(command,arguments);
+                //Console.WriteLine("Please Wait!\n This Could Take a While! ....");
+                //Processor.InvokeProcess(command,arguments);
                 Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n Creating Database and building directory structure...");
-                
-                if(_isDatabaseTask)
-                    DatabaseContext.Build().Database.EnsureCreated();
 
+                if (_isDatabaseTask) 
+                    DatabaseContext.Build().Database.EnsureCreated();
+                
                 BuildDirectoryStructure(OriginalDirectory);
-                DatabaseContext.AppDatabase.Dispose();
             }
             catch (Exception e)
             {
@@ -134,7 +135,7 @@ namespace AWSS3Zip.Commands
 
                 first = true;
 
-                return Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Name, first, node);
+                return Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node, first);
 
             }
 
@@ -145,29 +146,66 @@ namespace AWSS3Zip.Commands
                             node;
         }
 
-        private DirectoryNode Unzip_File_Execute_SQL_Task_And_Recurse_Directory(string directory, string name, bool first, DirectoryNode node)
+        private DirectoryNode Unzip_File_Execute_SQL_Task_And_Recurse_Directory(string directory, DirectoryNode node, bool first,  Func<DirectoryNode, bool> cleanupNode = null, bool isParent = false)
         {
+            if (cleanupNode != null)
+            {
+                if (isParent && node.Inside != null)
+                {
+                    if (node.Inside.Type == FileType.Folder)
+                        Directory.Delete(node.Inside.Path);
+                    else File.Delete(node.Inside.Path);
+                }
+                else if (!isParent) {
+                    cleanupNode(node);
+                    if (node.Previous == null)
+                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node, first);
+                }
+            }
+
             var previousDirectory = directory;
-            directory = $"{directory}\\{name}";
+            directory = (!directory.Contains(node.Name.Substring(0,4)))? $"{directory}\\{node.Name}" : $"{directory}";
 
             if (Directory.Exists(directory))
+            {
+                if (Directory.GetFileSystemEntries(directory).Length == 0)
+                {
+                    if (node.Previous != null && node.Path.Equals(directory))
+                    {
+                        node = node.Previous;
+                        Cleanup(ref node);
+                    }
+                    else if (node.Previous != null && !node.Path.Equals(directory))
+                    {
+                        Directory.Delete(directory);
+                        directory = node.Path;
+                    }
+                    else if (node.Parent != null)
+                    {
+                        node = node.Parent;
+                        Cleanup(ref node, true);
+                    }
+                }
                 return BuildDirectoryStructure(directory, node.Inside, first);
+            }
             else
             {
-                if (node.Type.Equals(FileType.Zip) ) {
+                if (node.Type.Equals(FileType.Zip))
+                {
                     Console.WriteLine("Unzipping contents of inner zip files...May take a while.. ");
                     var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
                     var arguments = $@"x {directory} -o{previousDirectory}";
                     Processor.InvokeProcess(command, arguments);
 
-                 //   Console.WriteLine("Deleting previous zip file.. ");
-                 //   File.Delete(directory);
-                    node.Name += (node.Name.Contains('~'))? "" : "~";
-                    node.Path += (node.Path.Contains('~')) ? "" : "~"; 
+                    Console.WriteLine("Deleting previous zip file.. ");
+                    File.Delete(directory);
+                    node.Name += (node.Name.Contains('~')) ? "" : "~";
+                    node.Path += (node.Path.Contains('~')) ? "" : "~";
                     node.Type = FileType.Text;
                 }
 
-                if (node.Type.Equals(FileType.Text)) {
+                if (node.Type.Equals(FileType.Text))
+                {
                     var json = File.ReadAllText(node.Path);
 
                     json = json.Insert(0, "[") + "]";
@@ -175,7 +213,8 @@ namespace AWSS3Zip.Commands
 
                     var logEventList = JsonSerializer.Deserialize<List<IISLog>>(json);
 
-                    logEventList.ForEach(x => {
+                    logEventList.ForEach(x =>
+                    {
                         EntityLogEvents.AddRange(
                             x.logEvents.Select(s => new IISLogEvent()
                             {
@@ -192,12 +231,10 @@ namespace AWSS3Zip.Commands
 
                     if (_isDatabaseTask)
                     {
-                        DatabaseContext.AppDatabase.IISLogEvents.AddRange(EntityLogEvents);
-
+                        DatabaseContext.Build().IISLogEvents.AddRange(EntityLogEvents);
                         DatabaseContext.AppDatabase.SaveChanges();
 
                         EntityLogEvents = new List<IISLogEvent>();
-                        File.Delete(node.Path);
 
                         Console.WriteLine("Changes Saved to SQLite DB! \nYou can use Query Syntax -SQL to query data\nYou can take the local.db file and upload into SQLite db browser or MS Access");
                     }
@@ -207,17 +244,31 @@ namespace AWSS3Zip.Commands
                 var parts = previousDirectory.Split("\\");
                 directory = string.Join("\\", parts, 0, parts.Length - 1);
                 return (node.Previous != null) ?
-                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(previousDirectory, node.Previous.Name, first, node.Previous) :
+                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(previousDirectory, node.Previous , first, x => Cleanup(ref x)) :
                            (!directory.Equals(OriginalDirectory) && node.Parent != null) ?
-                                Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Parent.Previous.Name, first, node.Parent.Previous) :
+                                Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Parent, first, (x) => Cleanup(ref x), true) :
                                     node;
             }
         }
-
-        
-
-
-
+        private static bool Cleanup(ref DirectoryNode node, bool isParent = false)
+        {
+            if (!isParent)
+            {
+                if (node.Next.Type == FileType.Folder)
+                    Directory.Delete(node.Next.Path);
+                else if (node.Next.Type == FileType.Text)
+                    File.Delete(node.Next.Path);
+                node.Next = null;
+            }
+            else {
+                if (node.Inside.Type == FileType.Folder)
+                    Directory.Delete(node.Inside.Path);
+                else if (node.Inside.Type == FileType.Text)
+                    File.Delete(node.Inside.Path);
+                node.Inside = null;
+            }
+                return true;
+        }
 
     }
 }
