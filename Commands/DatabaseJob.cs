@@ -8,7 +8,7 @@ namespace AWSS3Zip.Commands
 {
     public class DatabaseJob : IProcessJob
     {
-        public IDatabaseContext<DatabaseFactory, AppDatabase> DatabaseContext { get; set; }
+        public IDatabaseContext<AppDatabase> DatabaseContext { get; set; }
         public string[] Parameters { get; set; }
         List<IISLogEvent> EntityLogEvents { get; set; }
 
@@ -28,14 +28,7 @@ namespace AWSS3Zip.Commands
             }
             
             if (iPath != -1) {
-                DatabaseContext.Build().Database.EnsureCreated();
-
-                var existingLogIds = DatabaseContext.AppDatabase.IISLogEvents.Select(s => s.Id).ToList();
-                var newLogsToSave = EntityLogEvents.Where(w => !existingLogIds.Contains(w.Id)).ToList();
-
-                DatabaseContext.AppDatabase.IISLogEvents.AddRange(newLogsToSave);
-                DatabaseContext.AppDatabase.SaveChanges();
-                DatabaseContext.AppDatabase.Dispose();
+              
 
                 Console.WriteLine("Changes Saved to SQLite DB! \nYou can use Query Syntax -SQL to query data\nYou can take the local.db file and upload into SQLite db browser or MS Access");
             }
@@ -45,10 +38,6 @@ namespace AWSS3Zip.Commands
 
         }
 
-
-        public DatabaseJob(IDatabaseContext<DatabaseFactory, AppDatabase> _dbContext) {
-            DatabaseContext = _dbContext;  
-        }
 
         public DatabaseJob BuildParameters(string[] parameters, List<IISLogEvent> entityLogEvents) {
             Parameters = parameters;

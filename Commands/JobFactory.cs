@@ -7,22 +7,11 @@ namespace AWSS3Zip.Commands
     public class JobFactory : IProcessFactory<IProcessJob>
     {
         public List<IProcessJob> Jobs { get; set; }
-        public IDatabaseContext<DatabaseFactory, AppDatabase> DatabaseContext { get; set; }
         private ExtractJob ExtractJob { get; set; }
-        private DatabaseJob DatabaseJob { get; set; }
-        private WriteFileJob WriteFileJob { get; set; }
 
 
-        public JobFactory(
-            IDatabaseContext<DatabaseFactory, AppDatabase> _databaseContext, 
-            ExtractJob _extractJob, 
-            DatabaseJob _databaseJob, 
-            WriteFileJob _writeFileJob
-            ) {
-            DatabaseContext = _databaseContext;
+        public JobFactory( ExtractJob _extractJob ) {
             ExtractJob = _extractJob;
-            DatabaseJob = _databaseJob;
-            WriteFileJob = _writeFileJob;
         }
 
         IProcessFactory<IProcessJob> IProcessFactory<IProcessJob>.Build(string[] parameters)

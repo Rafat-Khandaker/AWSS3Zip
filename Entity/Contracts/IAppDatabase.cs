@@ -13,5 +13,7 @@ namespace AWSS3Zip.Entity.Contracts
         public DbSet<IISLogEvent> IISLogEvents { get; set; }
 
         public string ConnectionString { get; set; }
+        public AppDatabase DetachEntities();
+        public void Attach_And_Save_Entities(List<IISLogEvent> newEntities);
     }
 }

@@ -1,0 +1,57 @@
+# Define the program path
+$programPath = $PWD+"\AWSS3Zip.exe"
+
+# Define the argument to pass to the program
+$argument = ""
+
+foreach ($arg in $args) {
+    $argument += $arg + " "  # Append with a space between arguments
+}
+
+# Combine the program path with the argument
+$fullCommand = "$programPath $argument"
+
+# Number of retries
+$maxRetries = 100
+$retryCount = 0
+
+# Function to run the program
+function Run-Program {
+    try {
+        Write-Host "Attempting to run the program with argument: $argument"
+        
+        # Run the program with the argument
+        $process = Start-Process -FilePath $programPath -ArgumentList $argument -PassThru
+        $process.WaitForExit()
+
+        # Check if the process exited with a failure code (non-zero exit code)
+        if ($process.ExitCode -ne 0) {
+            throw "Program failed with exit code $($process.ExitCode)"
+        }
+
+        Write-Host "Program ran successfully!"
+        return $true  # Success
+    }
+    catch {
+        Write-Host "Error: $_"
+        return $false  # Failure
+    }
+}
+
+# Retry logic
+while ($retryCount -lt $maxRetries) {
+    $retryCount++
+    $success = Run-Program
+
+    if ($success) {
+        break  # Exit the loop if the program ran successfully
+    }
+    else {
+        Write-Host "Retrying... ($retryCount/$maxRetries)"
+        Start-Sleep -Seconds 5  # Wait before retrying (optional)
+    }
+}
+
+if (!$success) {
+    Write-Host "Program failed after $maxRetries attempts."
+}

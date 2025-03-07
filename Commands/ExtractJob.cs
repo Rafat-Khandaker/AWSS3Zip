@@ -15,7 +15,6 @@ namespace AWSS3Zip.Commands
 {
     public class ExtractJob : IProcessJob
     {
-        public IDatabaseContext<DatabaseFactory, AppDatabase> DatabaseContext { get; set; }
 
         public string[] Parameters { get; set; }
         public string OriginalDirectory { get; set; }
@@ -23,10 +22,6 @@ namespace AWSS3Zip.Commands
 
         bool _isDatabaseTask = false;
 
-        public ExtractJob(IDatabaseContext<DatabaseFactory, AppDatabase> _dbContext)
-        {
-            DatabaseContext = _dbContext;
-        }
         public ExtractJob BuildParameters(string[] parameters)
         {
             Parameters = parameters;
@@ -49,7 +44,7 @@ namespace AWSS3Zip.Commands
 
             var iOutput = Array.IndexOf(Parameters, "-o");
             if (iOutput == -1) Array.IndexOf(Parameters, "--output");
-            if (iOutput != -1 && (Parameters[iOutput + 1].Contains("-") || Parameters[iOutput + 1].Contains("--"))){
+            if (iOutput != -1 && (Parameters[iOutput + 1].Contains("-") || Parameters[iOutput + 1].Contains("--"))) {
                 Console.WriteLine("Command not formatted Correctly, contains '-' or '--' followed by command variable");
                 return;
             }
@@ -60,7 +55,7 @@ namespace AWSS3Zip.Commands
             else Console.WriteLine("no execution command found!");
         }
 
-        private void ExtractZipFiles(int iPath, int iOutput = -1 ) {
+        private void ExtractZipFiles(int iPath, int iOutput = -1) {
             try
             {
                 OriginalDirectory = (iOutput != -1) ? Parameters[iOutput + 1] : $"{AppDomain.CurrentDomain.BaseDirectory}output";
@@ -70,15 +65,19 @@ namespace AWSS3Zip.Commands
                 //Processor.InvokeProcess(command,arguments);
                 Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n Creating Database and building directory structure...");
 
-                if (_isDatabaseTask) 
-                    DatabaseContext.Build().Database.EnsureCreated();
-                
+                if (_isDatabaseTask)
+                    using (var context = new DatabaseContext()) {
+                        context.Build().Database.EnsureCreated();
+                        context.Database.SaveChanges();
+                    }
+
+
                 BuildDirectoryStructure(OriginalDirectory);
             }
             catch (Exception e)
             {
                 Console.WriteLine($"zip path file not found error!\nDetails:\n\t{e.Message}");
-            }        
+            }
         }
 
         private DirectoryNode BuildDirectoryStructure(string directory, DirectoryNode node = null, bool first = true)
@@ -117,15 +116,15 @@ namespace AWSS3Zip.Commands
                         {
                             node.Name = file.Split("\\").Last().ToString(); ;
                             node.Path = $"{file}";
-                            node.Type = node.Name.Contains('~')? FileType.Text : FileType.Zip;
+                            node.Type = node.Name.Contains('~') ? FileType.Text : FileType.Zip;
 
                             first = false;
                         }
                         else
                         {
                             var name = file.Split("\\").Last().ToString();
-                            node.Next = new DirectoryNode(name, $"{file}") { 
-                                Previous = node, Parent = node.Parent, Type = name.Contains('~') ? FileType.Text : FileType.Zip 
+                            node.Next = new DirectoryNode(name, $"{file}") {
+                                Previous = node, Parent = node.Parent, Type = name.Contains('~') ? FileType.Text : FileType.Zip
                             };
 
                             node = node.Next;
@@ -146,8 +145,9 @@ namespace AWSS3Zip.Commands
                             node;
         }
 
-        private DirectoryNode Unzip_File_Execute_SQL_Task_And_Recurse_Directory(string directory, DirectoryNode node, bool first,  Func<DirectoryNode, bool> cleanupNode = null, bool isParent = false)
+        private DirectoryNode Unzip_File_Execute_SQL_Task_And_Recurse_Directory(string directory, DirectoryNode node, bool first, Func<DirectoryNode, bool> cleanupNode = null, bool isParent = false)
         {
+            Console.Clear();
             if (cleanupNode != null)
             {
                 if (isParent && node.Inside != null)
@@ -164,7 +164,7 @@ namespace AWSS3Zip.Commands
             }
 
             var previousDirectory = directory;
-            directory = (!directory.Contains(node.Name.Substring(0,4)))? $"{directory}\\{node.Name}" : $"{directory}";
+            directory = (!directory.Contains(node.Name.Substring(0, 4))) ? $"{directory}\\{node.Name}" : $"{directory}";
 
             if (Directory.Exists(directory))
             {
@@ -231,9 +231,19 @@ namespace AWSS3Zip.Commands
 
                     if (_isDatabaseTask)
                     {
-                        DatabaseContext.Build().IISLogEvents.AddRange(EntityLogEvents);
-                        DatabaseContext.AppDatabase.SaveChanges();
-
+                        using (var context = new DatabaseContext().Build())
+                        {
+                            try
+                            {
+                                context.IISLogEvents.AddRange(EntityLogEvents);
+                                context.SaveChanges();
+                            }
+                            catch {
+                                context.Attach_And_Save_Entities(EntityLogEvents);
+                            }
+                            
+                        }           
+                        
                         EntityLogEvents = new List<IISLogEvent>();
 
                         Console.WriteLine("Changes Saved to SQLite DB! \nYou can use Query Syntax -SQL to query data\nYou can take the local.db file and upload into SQLite db browser or MS Access");
@@ -244,13 +254,13 @@ namespace AWSS3Zip.Commands
                 var parts = previousDirectory.Split("\\");
                 directory = string.Join("\\", parts, 0, parts.Length - 1);
                 return (node.Previous != null) ?
-                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(previousDirectory, node.Previous , first, x => Cleanup(ref x)) :
+                        Unzip_File_Execute_SQL_Task_And_Recurse_Directory(previousDirectory, node.Previous, first, x => Cleanup(ref x)) :
                            (!directory.Equals(OriginalDirectory) && node.Parent != null) ?
                                 Unzip_File_Execute_SQL_Task_And_Recurse_Directory(directory, node.Parent, first, (x) => Cleanup(ref x), true) :
                                     node;
             }
         }
-        private static bool Cleanup(ref DirectoryNode node, bool isParent = false)
+        private bool Cleanup(ref DirectoryNode node, bool isParent = false)
         {
             if (!isParent)
             {
@@ -267,8 +277,9 @@ namespace AWSS3Zip.Commands
                     File.Delete(node.Inside.Path);
                 node.Inside = null;
             }
-                return true;
+            return true;
         }
 
+    
     }
 }
