@@ -58,4 +58,4 @@ Path Variable Inside PShell...
 # Output
 
 The results of the extraction creates an output localdb file within the same directory as the AWSS3Zip.exe file.
-You may specify the -o parameter to move the localdb file into another directory location
+You may specify the -o parameter to move the localdb file into another directory location or provide connection string with -db flag to specify remote SQL DB
