@@ -45,4 +45,12 @@ The script can be accessed via Powershell command  AWS-S3-Extract.ps1.
 You would have to compile the application and build it into a bin folder using .NET Core DLL  - (Build from VS 2022) 
 Taking the entire contents inside the bin folder to the directory of the produced AWSS3Zip.exe file is the full application.
 
-You may enter the path of this location into the ENvironmental variables to access the command from powershell or CMD.
+You may enter the path of this location into the Environmental variables to access the command from powershell or CMD.
+
+Inside Directory...
+     .\aws-s3-extract -e C:\Path\example.zip -db
+
+Path Variable Inside PShell...
+     aws-s3-extract -e C:\Path\example.zip -db
+
+
