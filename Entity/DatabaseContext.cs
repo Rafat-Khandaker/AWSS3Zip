@@ -1,4 +1,5 @@
 ﻿using AWSS3Zip.Entity.Contracts;
+using AWSS3Zip.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -7,6 +8,8 @@ namespace AWSS3Zip.Entity
     public class DatabaseContext : IDatabaseContext<AppDatabase>, IDisposable
     {
         public AppDatabase Database { get; set; }
+        public SQLType Type { get; set; }
+
         public string ConnectionString { get; set; }
 
         string DefaultConnection = "Data Source=localdb.db";
@@ -28,8 +31,15 @@ namespace AWSS3Zip.Entity
             {
                 var optionsBuilder = new DbContextOptionsBuilder<AppDatabase>();
                 if (!connection.IsNullOrEmpty())
+                {
                     optionsBuilder.EnableSensitiveDataLogging().UseSqlServer(connection);
-                else optionsBuilder.EnableSensitiveDataLogging().UseSqlite(DefaultConnection);
+                    Type = SQLType.Microsoft;
+                }
+                else 
+                {
+                    optionsBuilder.EnableSensitiveDataLogging().UseSqlite(DefaultConnection);
+                    Type = SQLType.SQLite;
+                }
                 Database = new AppDatabase(optionsBuilder.Options);
             }
 

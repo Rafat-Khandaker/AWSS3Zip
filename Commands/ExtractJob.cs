@@ -1,13 +1,8 @@
 ﻿using AWSS3Zip.Commands.Contracts;
 using AWSS3Zip.Entity;
-using AWSS3Zip.Entity.Contracts;
 using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
 using AWSS3Zip.Service;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using Microsoft.IdentityModel.Tokens;
-using System.Linq;
 using System.Text.Json;
 
 
@@ -58,12 +53,17 @@ namespace AWSS3Zip.Commands
         private void ExtractZipFiles(int iPath, int iOutput = -1) {
             try
             {
-                OriginalDirectory = (iOutput != -1) ? Parameters[iOutput + 1] : $"{AppDomain.CurrentDomain.BaseDirectory}output";
+                string outputDirectory = (iOutput != -1)?  Parameters[iOutput + 1]: null;
+                OriginalDirectory = $"{AppDomain.CurrentDomain.BaseDirectory}output";
                 var command = $"{AppDomain.CurrentDomain.BaseDirectory}7-Zip\\7z.exe";
                 var arguments = $@"x {Parameters[iPath + 1]} -o{OriginalDirectory}";
-                //Console.WriteLine("Please Wait!\n This Could Take a While! ....");
-                //Processor.InvokeProcess(command,arguments);
-                Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n Creating Database and building directory structure...");
+                Console.WriteLine("Please Wait!\n This Could Take a While! ....");
+
+                if (Directory.GetFileSystemEntries($"{AppDomain.CurrentDomain.BaseDirectory}output").Length == 0)
+                    Processor.InvokeProcess(command, arguments);
+                else { Console.WriteLine("Directory Exists. Skipping zip extract..."); } 
+
+                    Console.WriteLine($"\n Files Extracted: {OriginalDirectory}\n Creating Database and building directory structure...");
 
                 if (_isDatabaseTask)
                     using (var context = new DatabaseContext()) {
@@ -71,8 +71,12 @@ namespace AWSS3Zip.Commands
                         context.Database.SaveChanges();
                     }
 
+                var root = BuildDirectoryStructure(OriginalDirectory);
+                Console.WriteLine($"Deleting Root Directory.. Finishing Job {root.Path}");
+                Directory.Delete(root.Path);
 
-                BuildDirectoryStructure(OriginalDirectory);
+                if(outputDirectory != null)
+                    File.Move($"{AppDomain.CurrentDomain.BaseDirectory}localdb", outputDirectory);
             }
             catch (Exception e)
             {

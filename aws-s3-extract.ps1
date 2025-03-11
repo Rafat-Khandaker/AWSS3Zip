@@ -1,6 +1,6 @@
 # Define the program path
-$programPath = $PWD+"\AWSS3Zip.exe"
-
+$programPath = $PWD.Path+"\AWSS3Zip.exe"
+ 
 # Define the argument to pass to the program
 $argument = ""
 
@@ -25,9 +25,9 @@ function Run-Program {
         $process.WaitForExit()
 
         # Check if the process exited with a failure code (non-zero exit code)
-        if ($process.ExitCode -ne 0) {
-            throw "Program failed with exit code $($process.ExitCode)"
-        }
+        if (-Not (Get-ChildItem -Path $PWD.Path+"\output")) {
+            throw "Did not process all files... re-running.."
+        } 
 
         Write-Host "Program ran successfully!"
         return $true  # Success
@@ -48,7 +48,7 @@ while ($retryCount -lt $maxRetries) {
     }
     else {
         Write-Host "Retrying... ($retryCount/$maxRetries)"
-        Start-Sleep -Seconds 5  # Wait before retrying (optional)
+        Start-Sleep -Seconds 2  # Wait before retrying (optional)
     }
 }
 

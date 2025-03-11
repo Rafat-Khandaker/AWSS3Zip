@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,6 +10,9 @@ namespace AWSS3Zip.Entity.Models
 {
     public class IISLogEvent
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int RowId { get; set; }
         public string Id { get; set; }
         public string? MessageType { get; set; }
         public string? Owner { get; set; }
