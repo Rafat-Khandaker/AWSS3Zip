@@ -10,7 +10,7 @@ becomes very painful to manage. Furtheremore the zip files are contained in Gzip
 
     root.zip
         -Level 1
-              - Level 2
+              - Level 2 ...
                   -File.zip
                   -File.zip
                   -File.zip
