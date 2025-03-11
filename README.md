@@ -8,25 +8,24 @@ becomes very painful to manage. Furtheremore the zip files are contained in Gzip
 
 # Directory Structure (Nested Zip Extraction)
 
-root.zip
-    -Level 1
-          - Level 2
-              -File.zip
-              -File.zip
-              -File.zip
-          - Level 2
-              -File.zip
-              -File.zip
+    root.zip
+        -Level 1
+              - Level 2
+                  -File.zip
+                  -File.zip
+                  -File.zip
+              - Level 2
+                  -File.zip
+                  -File.zip
+                  ...
+              ...          
+        -Level 1
+              - Level 2
+              - Level 2
+              - Level 2
+              - Level 2
               ...
-          ...
-              
-    -Level 1
-          - Level 2
-          - Level 2
-          - Level 2
-          - Level 2
-          ...
-    ...
+        ...
 
 
 # Solution
