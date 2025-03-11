@@ -48,9 +48,11 @@ Taking the entire contents inside the bin folder to the directory of the produce
 You may enter the path of this location into the Environmental variables to access the command from powershell or CMD.
 
 Inside Directory...
+
      .\aws-s3-extract -e C:\Path\example.zip -db
 
 Path Variable Inside PShell...
+
      aws-s3-extract -e C:\Path\example.zip -db
 
 
