@@ -55,3 +55,7 @@ Path Variable Inside PShell...
      aws-s3-extract -e C:\Path\example.zip -db
 
 
+# Output
+
+The results of the extraction creates an output localdb file within the same directory as the AWSS3Zip.exe file.
+You may specify the -o parameter to move the localdb file into another directory location
