@@ -4,6 +4,7 @@ using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
 using AWSS3Zip.Service;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using System.Text.Json;
 
 
@@ -79,8 +80,11 @@ namespace AWSS3Zip.Commands
                         if (context.Type == SQLType.Microsoft) {
                             var textSQL = File.ReadAllText($"{AppDomain.CurrentDomain.BaseDirectory}Text\\CreateTable.txt");
                             Console.WriteLine($"You may need to manually create the IISLogEvents table in the database..\nEntity Framework Cannot guarantee code first table creation on your database schema programmatically\nAttempting to run Create Script Query -- requires your account to have sufficient privilege through connections string\n\n{textSQL}");
-                         
-                            context.Database.Database.ExecuteSqlRaw(textSQL); 
+
+                            try { context.Database.Database.ExecuteSqlRaw(textSQL); }
+                            catch (Exception e) {
+                                Console.WriteLine($"Execute raw sql failed with message.. {e.Message}\n\n Table may exist.. Continuing process..");
+                            }
                            
                         }
                     }
