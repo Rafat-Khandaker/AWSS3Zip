@@ -13,7 +13,7 @@ namespace AWSS3Zip.Entity.Contracts
         public SQLType Type { get; set; }
 
         public DatabaseContext AddConnection(string connectionString);
-        public Y Build();
+        public Y Build(string connect);
 
     }
 }

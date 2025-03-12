@@ -20,19 +20,19 @@ namespace AWSS3Zip.Entity
             ConnectionString = connectionString;
             return this;
         }
-        public AppDatabase Build() => Build(ConnectionString);
+        public AppDatabase Build(string connect) => BuildDatabase(connect);
 
         public AppDatabase Detach() => Database.DetachEntities();
 
 
-        private AppDatabase Build(string connection = null)
+        private AppDatabase BuildDatabase(string connection = null)
         {
             if (Database == null)
             {
                 var optionsBuilder = new DbContextOptionsBuilder<AppDatabase>();
-                if (!connection.IsNullOrEmpty())
+                if (!(connection??ConnectionString).IsNullOrEmpty())
                 {
-                    optionsBuilder.EnableSensitiveDataLogging().UseSqlServer(connection);
+                    optionsBuilder.EnableSensitiveDataLogging().UseSqlServer(connection?? ConnectionString);
                     Type = SQLType.Microsoft;
                 }
                 else 

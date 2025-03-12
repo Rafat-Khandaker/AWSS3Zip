@@ -5,7 +5,13 @@ $programPath = $PWD.Path+"\AWSS3Zip.exe"
 $argument = ""
 
 foreach ($arg in $args) {
-    $argument += $arg + " "  # Append with a space between arguments
+    if($arg -like "*Server=*"){
+        $argument += "`"" +$arg +"`"" + " "
+        Write-Host "Arg contains server = $argument"
+    }
+    else{
+        $argument += $arg + " "  # Append with a space between arguments
+    }
 }
 
 # Combine the program path with the argument
@@ -18,14 +24,16 @@ $retryCount = 0
 # Function to run the program
 function Run-Program {
     try {
-        Write-Host "Attempting to run the program with argument: $argument"
+        Write-Host "Attempting to run the program with command: $fullCommand"
         
         # Run the program with the argument
         $process = Start-Process -FilePath $programPath -ArgumentList $argument -PassThru
         $process.WaitForExit()
 
         # Check if the process exited with a failure code (non-zero exit code)
-        if (-Not (Get-ChildItem -Path $PWD.Path+"\output")) {
+        $tempPath = $PWD.Path + "\output"
+        Write-Host "$tempPath"
+        if (Get-ChildItem -Path "$tempPath") {
             throw "Did not process all files... re-running.."
         } 
 

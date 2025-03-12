@@ -3,6 +3,7 @@ using AWSS3Zip.Entity;
 using AWSS3Zip.Entity.Models;
 using AWSS3Zip.Models;
 using AWSS3Zip.Service;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 
@@ -14,6 +15,7 @@ namespace AWSS3Zip.Commands
         public string[] Parameters { get; set; }
         public string OriginalDirectory { get; set; }
         public List<IISLogEvent> EntityLogEvents { get; set; }
+        public string ConnectionString { get; set; } = null;
 
         bool _isDatabaseTask = false;
 
@@ -27,8 +29,12 @@ namespace AWSS3Zip.Commands
         public void Execute()
         {
             var iPath = Array.IndexOf(Parameters, "-e");
-            _isDatabaseTask = Array.IndexOf(Parameters, "-db") != -1 || Array.IndexOf(Parameters, "--database") != -1;
+            var dbPosition = Array.IndexOf(Parameters, "-db") + Array.IndexOf(Parameters, "--database") + 1;
 
+            _isDatabaseTask = dbPosition >= 0;
+
+            if (_isDatabaseTask && Parameters.Length > dbPosition + 1 && Parameters[dbPosition + 1].Contains("Server="))
+                ConnectionString = Parameters[dbPosition + 1];
 
             if (iPath == -1) Array.IndexOf(Parameters, "--extract");
 
@@ -67,8 +73,16 @@ namespace AWSS3Zip.Commands
 
                 if (_isDatabaseTask)
                     using (var context = new DatabaseContext()) {
-                        context.Build().Database.EnsureCreated();
+                        
+                        context.Build(ConnectionString).Database.EnsureCreated();
                         context.Database.SaveChanges();
+                        if (context.Type == SQLType.Microsoft) {
+                            var textSQL = File.ReadAllText($"{AppDomain.CurrentDomain.BaseDirectory}Text\\CreateTable.txt");
+                            Console.WriteLine($"You may need to manually create the IISLogEvents table in the database..\nEntity Framework Cannot guarantee code first table creation on your database schema programmatically\nAttempting to run Create Script Query -- requires your account to have sufficient privilege through connections string\n\n{textSQL}");
+                         
+                            context.Database.Database.ExecuteSqlRaw(textSQL); 
+                           
+                        }
                     }
 
                 var root = BuildDirectoryStructure(OriginalDirectory);
@@ -168,7 +182,7 @@ namespace AWSS3Zip.Commands
             }
 
             var previousDirectory = directory;
-            directory = (!directory.Contains(node.Name.Substring(0, 4))) ? $"{directory}\\{node.Name}" : $"{directory}";
+            directory = (node.Name != null && !directory.Contains(node.Name.Substring(0, 4))) ? $"{directory}\\{node.Name}" : $"{directory}";
 
             if (Directory.Exists(directory))
             {
@@ -235,14 +249,15 @@ namespace AWSS3Zip.Commands
 
                     if (_isDatabaseTask)
                     {
-                        using (var context = new DatabaseContext().Build())
+                        using (var context = new DatabaseContext().Build(ConnectionString))
                         {
                             try
                             {
                                 context.IISLogEvents.AddRange(EntityLogEvents);
                                 context.SaveChanges();
                             }
-                            catch {
+                            catch(Exception ex) {
+                                Console.WriteLine($"Caught Error:\n{ex.Message}\n Retrying by Detatching Entities and saving individually modified..");
                                 context.Attach_And_Save_Entities(EntityLogEvents);
                             }
                             
