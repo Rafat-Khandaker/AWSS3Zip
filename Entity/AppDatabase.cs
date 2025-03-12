@@ -24,6 +24,7 @@ namespace AWSS3Zip.Entity
 
             foreach (var entry in trackedEntities)
             {
+          
                 entry.State = EntityState.Detached;
             }
 
@@ -32,15 +33,17 @@ namespace AWSS3Zip.Entity
             return this;
         }
 
-        public void Attach_And_Save_Entities(List<IISLogEvent> newEntities) { 
-
-            foreach(var entity in newEntities)
+        public void Attach_And_Save_Entities(List<IISLogEvent> newEntities) {
+            var rowCount = int.Parse(IISLogEvents.Max(e => e.Id));
+            foreach (var entity in newEntities)
             {
                var existingEntity = ChangeTracker.Entries<IISLogEvent>()
                                         .FirstOrDefault(e => e.Entity.Id == entity.Id);
 
-                if(existingEntity != null)
+                if (existingEntity != null) {
+                    entity.RowId = ++rowCount;
                     Entry(existingEntity.Entity).CurrentValues.SetValues(entity);
+                }
                 else IISLogEvents.Attach(entity);
 
                 try { 
